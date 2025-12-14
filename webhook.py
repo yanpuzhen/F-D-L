@@ -2,10 +2,25 @@ import main
 import requests
 import user
 import json
+import time
+import hmac
+import hashlib
+import base64
+import urllib.parse
 
+def get_signed_url(url, secret):
+    if not secret:
+        return url
+    timestamp = str(round(time.time() * 1000))
+    secret_enc = secret.encode('utf-8')
+    string_to_sign = '{}\n{}'.format(timestamp, secret)
+    string_to_sign_enc = string_to_sign.encode('utf-8')
+    hmac_code = hmac.new(secret_enc, string_to_sign_enc, digestmod=hashlib.sha256).digest()
+    sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+    return f"{url}&timestamp={timestamp}&sign={sign}"
 
 def topLogin(data: list) -> None:
-    endpoint = main.webhook_dingtalk_url
+    endpoint = get_signed_url(main.webhook_dingtalk_url, main.webhook_dingtalk_secret)
 
     rewards: user.Rewards = data[0]
     login: user.Login = data[1]
@@ -63,7 +78,7 @@ def topLogin(data: list) -> None:
 
 
 def shop(item: str, quantity: str) -> None:
-    endpoint = main.webhook_dingtalk_url
+    endpoint = get_signed_url(main.webhook_dingtalk_url, main.webhook_dingtalk_secret)
     
     jsonData = {
         "msgtype": "markdown",
@@ -84,7 +99,7 @@ def shop(item: str, quantity: str) -> None:
 
 
 def drawFP(servants, missions) -> None:
-    endpoint = main.webhook_dingtalk_url
+    endpoint = get_signed_url(main.webhook_dingtalk_url, main.webhook_dingtalk_secret)
 
     message_mission = ""
     message_servant = ""
@@ -127,7 +142,7 @@ def drawFP(servants, missions) -> None:
 
 
 def LTO_Gacha(servants) -> None:
-    endpoint = main.webhook_dingtalk_url
+    endpoint = get_signed_url(main.webhook_dingtalk_url, main.webhook_dingtalk_secret)
 
     message_servant = ""
     
@@ -164,7 +179,7 @@ def LTO_Gacha(servants) -> None:
 
 
 def Free_Gacha(servants) -> None:
-    endpoint = main.webhook_dingtalk_url
+    endpoint = get_signed_url(main.webhook_dingtalk_url, main.webhook_dingtalk_secret)
     message_servant = ""
     
     if (len(servants) > 0):
@@ -200,7 +215,7 @@ def Free_Gacha(servants) -> None:
 
 
 def Present(name, namegift, object_id_count) -> None:
-    endpoint = main.webhook_dingtalk_url
+    endpoint = get_signed_url(main.webhook_dingtalk_url, main.webhook_dingtalk_secret)
     
     jsonData = {
         "msgtype": "markdown",

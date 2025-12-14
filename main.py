@@ -11,7 +11,8 @@ import sys
 userIds = os.environ['userIds'].split(',')
 authKeys = os.environ['authKeys'].split(',')
 secretKeys = os.environ['secretKeys'].split(',')
-webhook_dingtalk_url = os.environ['DINGTALK_WEBHOOK']
+webhook_dingtalk_url = os.environ.get('DINGTALK_WEBHOOK')
+webhook_dingtalk_secret = os.environ.get('DINGTALK_SECRET')
 device_info = os.environ.get('DEVICE_INFO_SECRET')
 appCheck = os.environ.get('APP_CHECK_SECRET')
 user_agent_2 = os.environ.get('USER_AGENT_SECRET_2')
