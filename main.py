@@ -56,7 +56,7 @@ def main():
                 time.sleep(0.5)
                 instance.lq002()
                 time.sleep(2)
-                instance.buyBlueApple()
+                #instance.buyBlueApple()
                 time.sleep(1)
                 instance.lq003()
                 time.sleep(1)
