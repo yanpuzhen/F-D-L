@@ -66,7 +66,7 @@ def topLogin(data: list) -> None:
                     f"- **今日FP**: +{login.add_fp}\n"
                     f"- **当前AP**: {login.remaining_ap}\n"
                     f"- **圣杯**: {rewards.holygrail}\n"
-                    f"![Image](https://www.fate-go.jp/manga_fgo/images/commnet_chara01.png)"
+
         }
     }
 
@@ -87,7 +87,7 @@ def shop(item: str, quantity: str) -> None:
             "text": f"### FGO自动购物 - {main.fate_region}\n\n"
                     f"**购买成功**\n\n"
                     f"- **商店**: 消费 {40 * quantity}Ap 购买 {quantity}x {item}\n"
-                    f"![Image](https://www.fate-go.jp/manga_fgo2/images/commnet_chara10.png)"
+
         }
     }
 
@@ -130,7 +130,7 @@ def drawFP(servants, missions) -> None:
                     f"**每日免费友情抽卡**\n\n"
                     f"{message_mission}\n"
                     f"- **友情卡池**: {message_servant}\n"
-                    f"![Image](https://www.fate-go.jp/manga_fgo/images/commnet_chara02_rv.png)"
+
         }
     }
 
@@ -167,7 +167,7 @@ def LTO_Gacha(servants) -> None:
             "text": f"### FGO限定抽卡 - {main.fate_region}\n\n"
                     f"**限定友情抽卡结果**\n\n"
                     f"- **限定卡池**: {message_servant}\n"
-                    f"![Image](https://www.fate-go.jp/manga_fgo/images/commnet_chara02_rv.png)"
+
         }
     }
 
@@ -203,7 +203,7 @@ def Free_Gacha(servants) -> None:
             "text": f"### FGO每日免费单抽 - {main.fate_region}\n\n"
                     f"**每日免费单抽结果**\n\n"
                     f"- **常驻卡池**: {message_servant}\n"
-                    f"![Image](https://www.fate-go.jp/manga_fgo2/images/commnet_chara13_rv.png)"
+
         }
     }
 
@@ -224,7 +224,7 @@ def Present(name, namegift, object_id_count) -> None:
             "text": f"### FGO兑换系统 - JP\n\n"
                     f"**兑换成功**\n\n"
                     f"- **{name}**: {namegift} x{object_id_count}\n"
-                    f"![Image](https://www.fate-go.jp/manga_fgo2/images/commnet_chara06.png)"
+
         }
     }
 
