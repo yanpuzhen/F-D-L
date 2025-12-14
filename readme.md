@@ -5,9 +5,9 @@
 > 
 > 特此提醒，使用本存储库以外类似存储库的代码前，应检查代码是存在否异常行为防止出现盗号和其它损失！
 
+ # FGO每日自动登录 (青龙面板修改版)
 
-
- # FGO每日自动登录
+本项目基于 [DNNDHH/F-D-L](https://github.com/DNNDHH/F-D-L) 修改，适配青龙面板运行，并使用钉钉机器人推送通知。
 
 <img width="40%" style="border: 1px solid black" src="./libs/2024-10-20 204307.png">
 
@@ -22,12 +22,13 @@
 - [Isaac](https://github.com/O-Isaac)
 - [FGODailyBonus](https://github.com/hexstr/FGODailyBonus)
 - [FGO-Daily-Login](https://github.com/O-Isaac/FGO-Daily-Login)
+- [DNNDHH/F-D-L](https://github.com/DNNDHH/F-D-L) (**原项目地址**)
   
 
 它具有以下特点：
-- 不会产生日志
+- 适配青龙面板 (Python3)
 - 全自动游戏版本更新同步
-- 向你的Discord频道发送登录结果等信息
+- 向你的钉钉群发送登录结果等信息 (Markdown格式，无图模式)
 - 只支持 JP 版本游戏(日服)😛
 - ---------------------------------------------------------------------------------- -
 - Fork此库后按顺序操作
@@ -53,77 +54,57 @@ adb shell cp /storage/emulated/0/Android/data/com.aniplex.fategrandorder/files/d
 请小心处理这些数据，你不应将此数据传递给其他人，这是直接与服务器通信的关键数据，能直接盗你的号！
 
 1. 下载 FGO-ADET ，按照解密方法, 并解密游戏文件! [FGO-ADET](https://github.com/DNNDHH/FGO-ADET)
-2. 将userId.txt中的值 填写到 GAME_USERIDS 
-3. 将authKey.txt中的值 填写到 GAME_AUTHKEYS
-4. 将secretKey.txt中的值 填写到 GAME_SECRETKEYS
+2. 获取 userId, authKey, secretKey
 
-# 3. 获取设备信息
+# 3. 获取设备信息 (可选)
 
 1. 获取你的设备（手机或模拟器）的 用户代理 & 设备信息 : [Post Device info](https://github.com/DNNDHH/Post-Device-info)
-2. 复制得到的 UserAgent 填写到 USER_AGENT_SECRET_2 
-3. 复制得到的 Device Info 填写到 DEVICE_INFO_SECRET 
+2. 得到的 UserAgent 留作 USER_AGENT_SECRET_2 备用
+3. 得到的 Device Info 留作 DEVICE_INFO_SECRET 备用
 
 
-# 4. 创建 Discord 消息通知机器人
-- 要创建 Webhook Discord，您需要在 Discord 中创建一个服务器 并在该频道的 设置中 创建一个 文本频道
-- `integration > webhook > create webhook > copy url webhook`
-- 复制获得的 Webhook URL 填写到 DISCORD_WEBHOOK 
+# 4. 创建 钉钉 消息通知机器人
+- 在钉钉群组设置中添加自定义机器人
+- 安全设置选择 "加签"
+- 复制 `Webhook` 地址
+- 复制 `SEC` 开头的密钥 (Secret)
 
 
-# 5. 填写 Github Secrets
+# 5. 青龙面板环境变量设置
 
-创建 密钥类型，并将之前步骤获得的数值 填写到 对应的 密钥类型 中 `右上角 > settings > Secrets and variables > actions`
-<img width="75%" style="border: 1px solid black" src="https://i.imgur.com/J7jb6TX.png">
+在青龙面板的 "环境变量" 中添加以下变量：
 
-需要登录多个账号时使用 英文逗号
- ```console
-,
-  ```
-隔开！ 注意填写 账号密钥 时 顺序相同 ！
-
-| 密钥类型 | 账号密钥 样本 |
-| --- | --- |
-| GAME_AUTHKEYS | RaNdOmStRiNg1234:randomAAAAA=,RaNdOmStRiNg1235:randomBBBB= |
-| GAME_SECRETKEYS | RaNdOmStRiNg1234:randomAAAAA=,RaNdOmStRiNg1235:randomBBBB= |
-| GAME_USERIDS | 1234,1235 |
-| USER_AGENT_SECRET_2 | Dalvik/2.1.0 (Linux; U; Android 14; Pixel 5 Build/UP1A.231105.001) 建议不要照抄 |
-| DEVICE_INFO_SECRET | Google Pixel 5 / Android OS 14 / API-34 (UP1A.231105.001/10817346) 建议不要照抄 |
-| DISCORD_WEBHOOK | https://discord.com/api/webhooks/randomNumber/randomString / 填写你自己的 Webhooks 链接 |
-| APP_CHECK_SECRET | 留空 不填写  |
+| 变量名 | 说明 | 示例 |
+| --- | --- | --- |
+| `userIds` | 游戏 User ID，多个账号用逗号分隔 | `123456789,987654321` |
+| `authKeys` | 游戏 Auth Key，多个账号用逗号分隔 | `key1,key2` |
+| `secretKeys` | 游戏 Secret Key，多个账号用逗号分隔 | `secret1,secret2` |
+| `DINGTALK_WEBHOOK` | 钉钉机器人 Webhook 地址 | `https://oapi.dingtalk.com/robot/send?access_token=...` |
+| `DINGTALK_SECRET` | 钉钉机器人加签密钥 | `SEC...` |
+| `USER_AGENT_SECRET_2` | (选填) 设备 User Agent | `Dalvik/2.1.0...` |
+| `DEVICE_INFO_SECRET` | (选填) 设备 Info | `Google Pixel 5...` |
+| `APP_CHECK_SECRET` | (选填) App Check | 留空 |
 
 
-# 6. 设置执行 定时签到任务/ 定时登录 
+# 6. 设置执行 定时签到任务
 
-定时登录 FGO的时间 [世界时](https://time.is/zh/compare/utc/Beijing) 
+在青龙面板中添加定时任务：
+- **命令**: `python3 main.py`
+- **定时规则**: 自定义，例如 `0 19 * * *` (每天19点)
 
-| 版本 | 自动登录时间   |
-|--------|-------------|
-| JP     | 30 19 * * * |
-
-
-🫠 代码格式 30 19 * * * 是指 UTC时间 19：30 = 天朝时间 凌晨3点半 ，参考 [世界时](https://time.is/zh/compare/utc/Beijing) 
-
-修改 自动流程 [这里](https://github.com/DNNDHH/F-D-L/blob/master/.github/workflows/run.yml) 的代码 自定义 自动登录时间
- ```console
-  schedule:
-    - cron: "00 03 * * *"
-    - cron: "30 03 * * *"
-    - cron: "30 13 * * *"
-    - cron: "30 17 * * *"
-  ```  
 - -------------------------------------------------------------------------------------- -
 
 # 已完成 
+- [x] 适配青龙面板运行
+- [x] 钉钉机器人通知 (支持签名校验)
+- [x] 移除通知图片
 - [x] 自动每日友情召唤/友情活动限定召唤
-- [x] 自动种蓝苹果🍎
 - [x] 自动领取礼物盒
 - [x] 自动兑换达芬奇商店 每月&限时活动 呼符
 - [x] 自动兑换 素材交換券
+- [x] 屏蔽自动种蓝苹果 (已注释)
+
 - -------------------------------------------------------------------------------------- -
-# 未来计划 （咕咕咕🤣）
-- [ ] 待定…
 # 感谢
+- [DNNDHH/F-D-L](https://github.com/DNNDHH/F-D-L) (本项目基于此仓库修改)
 - [hexstr](https://github.com/hexstr) 
-
-
-
