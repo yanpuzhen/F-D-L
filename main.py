@@ -71,7 +71,7 @@ def main():
                 instance.LTO_drawFP()
                 time.sleep(1)
 
-                if "--Farm_XA" in sys.argv:
+                if "--Farm_XA" in sys.argv or os.environ.get("FARM_XA") == "1":
                     instance.farmQuest()
 
             

@@ -101,6 +101,8 @@ adb shell cp /storage/emulated/0/Android/data/com.aniplex.fategrandorder/files/d
 
 例如：`python3 main.py --Farm_XA`
 
+也可以在青龙的 `config.sh` 或环境变量里设置 `FARM_XA=1` 来开启刷本，不用改定时任务命令。
+
 > ⚠️ `--Farm_XA` 会直接向服务器提交战斗结算，封号风险高于单纯签到，默认不启用。
 > 使用账号当前选中的编队和助战列表里的第一个助战；AP 不足时自动停止。
 > 如果通知里提示"战斗已开始但结算失败"，账号里会留有一场进行中的战斗，需要进游戏手动处理。
