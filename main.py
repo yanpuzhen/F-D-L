@@ -59,7 +59,10 @@ def main():
                 time.sleep(2)
                 #instance.buyBlueApple()
                 time.sleep(1)
-                instance.lq003()
+                try:
+                    instance.lq003()
+                except Exception as ex:
+                    logger.error(f'兑换商店呼符失败，跳过: {ex}')
                 time.sleep(1)
 
                 if "--Free_Gacha" in sys.argv:

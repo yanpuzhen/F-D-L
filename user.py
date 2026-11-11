@@ -944,9 +944,11 @@ xCGlz9vV3+AAQ31C2phoyd/QhvpL85p39n6Ibg==
     def lq003(self):
         # https://game.fate-go.jp/shop/purchase
         
-        url = 'https://git.atlasacademy.io/atlasacademy/fgo-game-data/raw/branch/JP/master/mstShop.json'
-        response = requests.get(url)
-        fdata = response.json()
+        # git.atlasacademy.io 现在需要登录, 改用 Atlas API 的 raw 商店数据 (字段与 mstShop 相同)
+        url = 'https://api.atlasacademy.io/raw/JP/shop/search?payType=mana'
+        response = requests.get(url, timeout=120)
+        response.raise_for_status()
+        fdata = [row['mstShop'] for row in response.json()]
         max_base_shop_id = None
         max_base_shop_s_id = None
         max_base_lim_it_Num = None 
