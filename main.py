@@ -71,6 +71,9 @@ def main():
                 instance.LTO_drawFP()
                 time.sleep(1)
 
+                if "--Farm_XA" in sys.argv:
+                    instance.farmQuest()
+
             
                 
 

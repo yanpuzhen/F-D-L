@@ -23,3 +23,29 @@ def getAssetBundle(assetbundle):
     data_unpacked = msgpack.unpackb(gzip_data)
 
     return data_unpacked
+
+# ===== battle/result =====
+# 战斗结算包: msgpack -> Rijndael-256-CBC -> base64
+# 密钥串前32字节 ^4 作 key, 后32字节 ^8 作 iv (JP)
+_battle_key_src = b'kzdMtpmzqCHAfx00saU1gIhTjYCuOD1JstqtisXsGYqRVcqrHRydj3k6vJCySu3g'
+
+
+def _battleCipher():
+    key = bytes(b ^ 4 for b in _battle_key_src[:32])
+    iv = bytes(b ^ 8 for b in _battle_key_src[32:])
+    return py3rijndael.RijndaelCbc(
+        key,
+        iv,
+        py3rijndael.paddings.Pkcs7Padding(32),
+        32
+    )
+
+
+def encryptBattleResult(dictionary):
+    packed = msgpack.packb(dictionary)
+    return base64.b64encode(_battleCipher().encrypt(packed)).decode()
+
+
+def decryptBattleResult(text):
+    data = _battleCipher().decrypt(base64.b64decode(text))
+    return msgpack.unpackb(data, strict_map_key=False)

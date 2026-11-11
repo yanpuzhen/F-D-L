@@ -19,6 +19,8 @@ import random
 import time
 import requests
 import shutil
+import struct
+import CatAndMouseGame
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -646,6 +648,243 @@ xCGlz9vV3+AAQ31C2phoyd/QhvpL85p39n6Ibg==
 
     
     
+    def _findTable(self, data, name):
+        # 在响应的 cache 里找表 (updated / replaced 都可能出现)
+        cache = data.get('cache', {})
+        for part in ('updated', 'replaced'):
+            rows = cache.get(part, {}).get(name)
+            if rows:
+                return rows
+        return []
+
+    def _pickFollower(self, questId, questPhase):
+        # https://game.fate-go.jp/follower/list
+        # 取助战列表里第一个可用的助战 (好友 / 非好友)
+        self.builder_.AddParameter('questId', str(questId))
+        self.builder_.AddParameter('questPhase', str(questPhase))
+        self.builder_.AddParameter('refresh', '0')
+        data = self.Post(f'{fgourl.server_addr_}/follower/list?_userId={self.user_id_}')
+
+        for userFollower in self._findTable(data, 'userFollower'):
+            for follower in userFollower.get('followerInfo', []):
+                if follower.get('type') not in (1, 2):
+                    continue
+                for svt in follower.get('userSvtLeaderHash', []):
+                    if svt.get('svtId'):
+                        return follower, svt
+        raise Exception('助战列表里没有可用的助战')
+
+    def _battleSetup(self, questId, questPhase, activeDeckId, follower, followerSvt):
+        # https://game.fate-go.jp/battle/setup
+        params = [
+            ('questId', questId),
+            ('questPhase', questPhase),
+            ('activeDeckId', activeDeckId),
+            ('followerId', follower['userId']),
+            ('followerClassId', followerSvt.get('classId', 0)),
+            ('followerGrandGraphId', followerSvt.get('grandGraphId', 0)),
+            ('itemId', 0),
+            ('boostId', 0),
+            ('enemySelect', 0),
+            ('questSelect', 0),
+            ('userEquipId', 0),
+            ('followerType', follower['type']),
+            ('routeSelect', '[]'),
+            ('choiceRandomLimitCounts', '{}'),
+            ('followerRandomLimitCount', 0),
+            ('followerSpoilerProtectionLimitCount', 4),
+            ('followerDispLimitCount', 0),
+            ('followerIconLimitCount', 0),
+            ('followerPortraitLimitCount', 0),
+            ('followerCommandCardLimitCount', 0),
+            ('choiceTransformRandomLimitCounts', '{}'),
+            ('followerTransformRandomLimitCount', 0),
+            ('followerTransformSpoilerProtectionLimitCount', 0),
+            ('followerTransformDispLimitCount', 0),
+            ('followerTransformIconLimitCount', 0),
+            ('followerTransformPortraitLimitCount', 0),
+            ('followerTransformCommandCardLimitCount', 0),
+            ('recommendSupportIdx', 0),
+            ('followerSupportDeckId', followerSvt.get('supportDeckId', 0)),
+            ('campaignItemId', 0),
+            ('restartWave', 0),
+            ('useRewardAddItemIds', '[]'),
+        ]
+        for key, value in params:
+            self.builder_.AddParameter(key, str(value))
+
+        data = self.Post(f'{fgourl.server_addr_}/battle/setup?_userId={self.user_id_}')
+
+        battles = self._findTable(data, 'battle')
+        if not battles:
+            raise Exception('battle/setup 没有返回战斗数据')
+        return battles[0]
+
+    def _battleResultWin(self, battle):
+        # https://game.fate-go.jp/battle/result
+        battleId = int(battle['id'])
+        battleInfo = battle['battleInfo']
+        enemyDeck = battleInfo.get('enemyDeck', [])
+        stageCount = len(enemyDeck)
+        if stageCount == 0:
+            raise Exception('战斗数据里没有敌人')
+
+        # 每波用掉的回合数: 最后一波 1 回合, 敌人超过 3 个时每多一屏 +1
+        usedTurnList = []
+        for index, stage in enumerate(enemyDeck):
+            turn = 1 if index == stageCount - 1 else 0
+            enemyCount = len(stage.get('svts', []))
+            turn += max((enemyCount + 2) // 3, 1) - 1
+            usedTurnList.append(turn)
+        totalTurns = sum(max(1, t) for t in usedTurnList)
+
+        # 出牌记录 (从者uniqueId + 指令卡类型), 每回合 3 张
+        turnLogs = ['1B2B3B', '1B1D2C', '1B1C2B']
+        logs = ''.join(turnLogs[i % 3] for i in range(totalTurns))
+        dt = ''.join(f"u{svt['uniqueId']}" for svt in enemyDeck[-1].get('svts', []))
+        action = '{ "logs":"%s", "dt":"%s", "hd":"", "data":"" }' % (logs, dt)
+
+        calledEnemyUniqueIds = [
+            svt['uniqueId']
+            for deck in battleInfo.get('callDeck', [])
+            for svt in deck.get('svts', [])
+        ]
+
+        battleResult = 1  # 1: 胜利
+        aliveUniqueIds = []
+
+        # 校验值: 5 个 int64 (小端) 拼起来算 crc32
+        # 依次为 userId+battleResult / raid 合计 / 存活敌人id合计 / battleId / superBoss 合计
+        battleStatus = binascii.crc32(struct.pack(
+            '<5q',
+            self.user_id_ + battleResult,
+            0 - 4231125,
+            sum(aliveUniqueIds) // 2,
+            battleId - 2147483647,
+            0 - 2469110,
+        ))
+
+        result = {
+            'battleId': battleId,
+            'battleResult': battleResult,
+            'winResult': 1,
+            'scores': '',
+            'action': action,
+            'raidResult': '[]',
+            'superBossResult': '[]',
+            'elapsedTurn': 1,
+            'recordType': 1,
+            'recordValueJson': {'turnMaxDamage': 0, 'knockdownNum': 0, 'totalDamageToAliveEnemy': 0},
+            'tdPlayed': '[]',
+            'useTreasureDevices': '[]',
+            'usedEquipSkillList': {},
+            'svtCommonFlagList': {},
+            'skillShiftUniqueIds': [],
+            'skillShiftNpcSvtIds': [],
+            'calledEnemyUniqueIds': calledEnemyUniqueIds,
+            'routeSelect': [],
+            'dataLostUniqueIds': [],
+            'aliveUniqueIds': aliveUniqueIds,
+            'battleStatus': battleStatus,
+            'voicePlayedList': '[]',
+            'usedTurnList': usedTurnList,
+            'waveInfo': '[]',
+            'reachedWave': stageCount,
+            'battleMissionTargetIds': [],
+            'battleMissionTargetValues': [],
+        }
+
+        self.builder_.AddParameter('result', CatAndMouseGame.encryptBattleResult(result))
+        return self.Post(f'{fgourl.server_addr_}/battle/result?_userId={self.user_id_}')
+
+    def farmQuest(self, questId=93000001, times=3, questName='未確認座標Ｘ－Ａ 屋敷跡', apCost=3, maxPhase=3):
+        # 刷自由本: follower/list -> battle/setup -> (等待) -> battle/result
+        # 默认: 冬木 未確認座標Ｘ－Ａ「屋敷跡」 3AP, 用当前选中的编队 + 助战列表第一个
+        with open('login.json', 'r', encoding='utf-8') as file:
+            login = json.load(file)
+
+        userGame = login['cache']['replaced']['userGame'][0]
+        activeDeckId = userGame['activeDeckId']
+
+        # 当前 AP
+        actMax = userGame['actMax']
+        recover = userGame['actRecoverAt'] - mytime.GetTimeStamp()
+        if recover > 0:
+            nowAp = max(actMax - (recover + 299) // 300, 0)
+        else:
+            nowAp = actMax + userGame.get('carryOverActPoint', 0)
+
+        # 要打的阶段: 已通关的阶段 +1, 全通之后重复最后一个阶段
+        questPhase = 1
+        userQuests = login['cache']['replaced'].get('userQuest')
+        if userQuests is None:
+            questPhase = maxPhase
+        else:
+            for item in userQuests:
+                if item.get('questId') == questId:
+                    questPhase = min(item.get('questPhase', 0) + 1, maxPhase)
+                    break
+
+        doneCount = 0
+        drops = {}
+        note = ''
+
+        for i in range(times):
+            if nowAp < apCost:
+                note = f'AP不足 (剩余 {nowAp})，已停止'
+                main.logger.info(f"\n {'=' * 40} \n [+] {questName} {note} \n {'=' * 40} ")
+                break
+
+            battle = None
+            try:
+                follower, followerSvt = self._pickFollower(questId, questPhase)
+                time.sleep(random.uniform(2, 4))
+
+                battle = self._battleSetup(questId, questPhase, activeDeckId, follower, followerSvt)
+                main.logger.info(f"\n {'=' * 40} \n [+] {questName} 第{i + 1}次 开始战斗 battleId：{battle['id']} \n {'=' * 40} ")
+
+                # 模拟真实战斗耗时, 不要秒结算
+                time.sleep(random.uniform(35, 55))
+
+                data = self._battleResultWin(battle)
+            except Exception as ex:
+                if battle is not None:
+                    note = f"第{i + 1}次 战斗已开始但结算失败，账号里留有一场进行中的战斗 (battleId {battle['id']})，请进游戏处理: {ex}"
+                else:
+                    note = f'第{i + 1}次 开始战斗失败: {ex}'
+                main.logger.error(f"\n {'=' * 40} \n [-] {questName} {note} \n {'=' * 40} ")
+                break
+
+            doneCount += 1
+            nowAp -= apCost
+            questPhase = min(questPhase + 1, maxPhase)
+
+            for response in data['response']:
+                if response['resCode'] != "00":
+                    continue
+                resSuccess = response.get('success') or {}
+                for key in ('resultDropInfos', 'rewardInfos'):
+                    for drop in resSuccess.get(key) or []:
+                        objectId = drop.get('objectId')
+                        drops[objectId] = drops.get(objectId, 0) + drop.get('num', 0)
+
+            main.logger.info(f"\n {'=' * 40} \n [+] {questName} 第{i + 1}次 战斗胜利 \n {'=' * 40} ")
+            time.sleep(random.uniform(4, 8))
+
+        # 掉落物名称
+        itemNames = {}
+        if drops and os.path.exists('nice_item.json'):
+            try:
+                with open('nice_item.json', 'r', encoding='utf-8') as file:
+                    for item in json.load(file):
+                        itemNames[item.get('id')] = item.get('name')
+            except Exception:
+                pass
+        dropList = [f"{itemNames.get(objectId) or f'ID:{objectId}'} x{num}" for objectId, num in drops.items()]
+
+        webhook.farmQuest(questName, doneCount, times, dropList, note)
+
+
     def topHome(self):
         self.Post(f'{fgourl.server_addr_}/home/top?_userId={self.user_id_}')
         

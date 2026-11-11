@@ -233,3 +233,28 @@ def Present(name, namegift, object_id_count) -> None:
     }
 
     requests.post(endpoint, json=jsonData, headers=headers)
+
+def farmQuest(questName, doneCount, times, drops, note) -> None:
+    endpoint = get_signed_url(main.webhook_dingtalk_url, main.webhook_dingtalk_secret)
+
+    text = f"### FGO周回系统 - JP\n\n**{questName}**\n\n- 完成次数: {doneCount}/{times}\n"
+
+    if drops:
+        text += "- 掉落: " + "、".join(drops) + "\n"
+
+    if note:
+        text += f"\n> {note}\n"
+
+    jsonData = {
+        "msgtype": "markdown",
+        "markdown": {
+            "title": "FGO周回系统 - JP",
+            "text": text
+        }
+    }
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    requests.post(endpoint, json=jsonData, headers=headers)
