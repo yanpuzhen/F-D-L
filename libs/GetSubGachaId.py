@@ -1,35 +1,28 @@
 import requests
-import json
 import main
 
 from mytime import GetTimeStamp
 
+NICE_GACHA_URL = "https://api.atlasacademy.io/export/JP/nice_gacha.json"
+FP_GACHA_ID = 1
+
+
 def GetGachaSubIdFP():
-    response = requests.get(f"https://git.atlasacademy.io/atlasacademy/fgo-game-data/raw/branch/JP/master/mstGachaSub.json");
-    gachaList = json.loads(response.text)
+    # 同 gacha_lab: 只取常驻友情池 (gachaId=1) 当前开放、priority 最高的 gachaSubId
+    # 限定友情池 (如 gachaId=28) 的 subId 与 gachaId=1 不配套, 混用会报 [99]
+    # (旧的 git.atlasacademy.io/mstGachaSub.json 现在需要登录, 已无法使用)
     timeNow = GetTimeStamp()
-    priority = 0
-    goodGacha = {}
+    gachas = requests.get(NICE_GACHA_URL, timeout=120).json()
 
-    for gacha in gachaList:
-        openedAt = gacha["openedAt"]
-        closedAt = gacha["closedAt"]
+    for gacha in gachas:
+        if gacha.get("type") != "friendPoint" or gacha.get("id") != FP_GACHA_ID:
+            continue
+        if not (gacha["openedAt"] <= timeNow <= gacha["closedAt"]):
+            continue
+        subs = [s for s in gacha.get("gachaSubs", [])
+                if s["openedAt"] <= timeNow <= s["closedAt"]]
+        if subs:
+            return str(max(subs, key=lambda s: s["priority"])["id"])
 
-        # 修正逻辑运算符
-        if openedAt <= timeNow and timeNow <= closedAt:
-            p = int(gacha["priority"])
-            if p > priority:
-                priority = p
-                goodGacha = gacha
-
-    # 检查是否找到了合适的 gacha
-    if not goodGacha:
-        main.logger.info("No suitable gacha found")
-        return None  
-    
-    # 确认 'id' 键是否存在
-    if "id" not in goodGacha:
-        main.logger.info("Key 'id' not found in the selected gacha")
-        return None  
-
-    return str(goodGacha["id"])
+    main.logger.info("No suitable gacha found")
+    return None

@@ -68,10 +68,14 @@ def main():
                 if "--Free_Gacha" in sys.argv:
                     instance.Free_Gacha()
 
-                instance.drawFP()
+                try:
+                    instance.drawFP()
+                except Exception as ex:
+                    logger.error(f'友情召唤失败，跳过: {ex}')
                 time.sleep(1)
                 #instance.LTO_Gacha()
-                instance.LTO_drawFP()
+                # LTO_drawFP 写死的 gachaId 14~19 限定友情池早已结束，停用
+                #instance.LTO_drawFP()
                 time.sleep(1)
 
                 if "--Farm_XA" in sys.argv or os.environ.get("FARM_XA") == "1":

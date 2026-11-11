@@ -553,21 +553,20 @@ xCGlz9vV3+AAQ31C2phoyd/QhvpL85p39n6Ibg==
 
 
     def drawFP(self):
-        #SubID判定有点不准了.偶尔错误抽卡失败...等哪天闲暇再修
+        # 常驻友情池当前的 gachaSubId (取法同 gacha_lab)
         gachaSubId = GetGachaSubIdFP()
-        
 
         if gachaSubId is None:
-           gachaSubId = 0
-            
+            main.logger.info(f"\n {'=' * 40} \n [+] 没有找到开放中的友情池，跳过友情召唤 \n {'=' * 40} ")
+            return
+
         self.builder_.AddParameter('storyAdjustIds', '[]')
         self.builder_.AddParameter('selectBonusList', '')
         self.builder_.AddParameter('gachaId', '1')
         self.builder_.AddParameter('num', '10')
         self.builder_.AddParameter('ticketItemId', '0')
         self.builder_.AddParameter('shopIdIndex', '1')
-        #self.builder_.AddParameter('gachaSubId', gachaSubId)
-        self.builder_.AddParameter('gachaSubId', '473')
+        self.builder_.AddParameter('gachaSubId', gachaSubId)
 
         main.logger.info(f"\n {'=' * 40} \n [+] 友情卡池ID : {gachaSubId}\n {'=' * 40} " )
         data = self.Post(f'{fgourl.server_addr_}/gacha/draw?_userId={self.user_id_}')
