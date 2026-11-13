@@ -116,7 +116,7 @@ adb shell cp /storage/emulated/0/Android/data/com.aniplex.fategrandorder/files/d
 - [x] 自动每日友情召唤/友情活动限定召唤
 - [x] 自动领取礼物盒
 - [x] 自动兑换达芬奇商店 每月&限时活动 呼符
-- [x] 自动兑换 素材交換券
+- [x] 自动兑换 素材交換券：同批券选择兑换前库存最少的可选素材；库存相同时按选项顺序选择
 - [x] 自动周回 冬木 未確認座標Ｘ－Ａ (需加 `--Farm_XA` 参数)
 - [x] 屏蔽自动种蓝苹果 (已注释)
 

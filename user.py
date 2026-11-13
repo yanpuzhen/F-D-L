@@ -137,10 +137,22 @@ class user:
         self.user_id_ = (int)(user_id)
         self.s_ = fgourl.NewSession()
         self.builder_ = ParameterBuilder(user_id, auth_key, secret_key)
+        # None means no complete inventory has been received for this account.
+        self.item_counts_ = None
 
     def Post(self, url):
         res = fgourl.PostReq(self.s_, url, self.builder_.Build())
         self.builder_.Clean()
+        cache = res.get('cache') or {}
+        replaced = cache.get('replaced') or {}
+        if 'userItem' in replaced:
+            self.item_counts_ = {
+                item['itemId']: item['num'] for item in replaced['userItem']
+            }
+        if self.item_counts_ is not None:
+            # Updated rows contain absolute balances, not increments.
+            for item in (cache.get('updated') or {}).get('userItem', []):
+                self.item_counts_[item['itemId']] = item['num']
         return res
 
     def topLogin(self):
@@ -1113,87 +1125,84 @@ xCGlz9vV3+AAQ31C2phoyd/QhvpL85p39n6Ibg==
 
     
     def Present(self):
-        #素材交換券
-        response = requests.get("https://api.atlasacademy.io/export/JP/nice_item.json")
-        if response.status_code == 200:
-            with open("nice_item.json", 'wb') as f:
-                f.write(response.content)
-                
+        # Keep the existing behavior of redeeming one ticket type per run.
+        try:
+            response = requests.get(
+                'https://api.atlasacademy.io/export/JP/nice_item.json', timeout=120)
+            response.raise_for_status()
+            itemdata = response.json()
+        except (requests.RequestException, ValueError) as ex:
+            main.logger.warning(f'获取素材交换券选项失败，跳过兑换: {ex}')
+            return
+
+        # This catalogue also supplies farmQuest's drop names when no tickets exist.
+        with open('nice_item.json', 'w', encoding='utf-8') as file:
+            json.dump(itemdata, file, ensure_ascii=False)
+
         with open('present.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
-            
+
         user_present_box = data.get('cache', {}).get('replaced', {}).get('userPresentBox', [])
-        
         first_object_id = None
-        object_id_count = 0
-        object_ids = []
-        presentIds = []
+        present_ids = []
 
         for item in user_present_box:
-            if item.get('giftType') == 2:
-                object_id = item.get('objectId')
-                presentId = item.get('presentId')
-    
-                if object_id and 10000 <= object_id <= 20000:
-                    if first_object_id is None:
-                        first_object_id = object_id
-                        
-                if object_id == first_object_id:
-                    object_id_count += 1
-                    object_ids.append(str(object_id))
-                    presentIds.append(str(presentId))
+            object_id = item.get('objectId')
+            if item.get('giftType') != 2 or not isinstance(object_id, int):
+                continue
+            if not 10000 <= object_id <= 20000:
+                continue
+            if first_object_id is None:
+                first_object_id = object_id
+            if object_id == first_object_id:
+                present_ids.append(int(item['presentId']))
 
-                    datajs = [int(present_id) for present_id in presentIds]
-
-                    with open('Ticket.json', 'w') as f:
-                        json.dump(datajs, f, ensure_ascii=False)
-                else:
-                    continue
-
-        if first_object_id is not None:
-           
-           with open('nice_item.json', 'r', encoding='utf-8') as file:
-               itemdata = json.load(file)
-    
-           item_data = next((item for item in itemdata if item.get('id') == first_object_id), None)
-    
-           if item_data:
-               name = item_data.get('name', 'None')
-               item_selects = item_data.get('itemSelects', [])
-            
-               if item_selects:
-                   random_item = random.choice(item_selects)
-                   idxs = random_item.get('idx')
-                   gifts = random_item.get('gifts', [])
-                
-                   for gift in gifts:
-                       object_id = gift.get('objectId')
-                       
-                   item_name = next((item for item in itemdata if item.get('id') == object_id), None)
-                   namegift = item_name.get('originalName', 'None')
-
-                   with open('Ticket.json', 'r', encoding='utf-8') as file:
-                       presentdata = json.load(file)
-
-                   msgpack_data = msgpack.packb(presentdata)
-
-                   base64_encoded_data = base64.b64encode(msgpack_data).decode()
-                   
-                   self.builder_.AddParameter('presentIds', base64_encoded_data)
-                   self.builder_.AddParameter('itemSelectIdx', str(idxs))
-                   self.builder_.AddParameter('itemSelectNum', str(object_id_count))
-
-                   data = self.Post(
-                       f'{fgourl.server_addr_}/present/receive?_userId={self.user_id_}')
-    
-                   responses = data['response']
-
-                   main.logger.info(f"\n {'=' * 40} \n [+] {name} 兑换成功 \n {'=' * 40} " )
-        
-                   webhook.Present(name, namegift, object_id_count)
-                   
-        else:
+        if not present_ids:
             main.logger.info(f"\n {'=' * 40} \n [+] 礼物盒中交換券なし(´･ω･`) \n {'=' * 40} ")
+            return
+        if self.item_counts_ is None:
+            main.logger.warning('未获得当前账号的完整素材库存，跳过兑换素材交换券')
+            return
+
+        items_by_id = {item['id']: item for item in itemdata}
+        item_data = items_by_id.get(first_object_id, {})
+        # Material tickets exchange one ticket for one option containing one item.
+        item_selects = []
+        for option in item_data.get('itemSelects', []):
+            gifts = option.get('gifts') or []
+            if (isinstance(option.get('idx'), int)
+                    and option['idx'] > 0
+                    and option.get('requireNum', 1) == 1
+                    and len(gifts) == 1
+                    and gifts[0].get('type') == 'item'
+                    and isinstance(gifts[0].get('objectId'), int)
+                    and gifts[0]['objectId'] > 0
+                    and gifts[0].get('num', 0) > 0):
+                item_selects.append(option)
+        if not item_selects:
+            main.logger.warning(f'素材交换券 {first_object_id} 没有有效的素材选项，跳过兑换')
+            return
+
+        # Missing rows in a complete inventory mean zero stock. min() keeps the
+        # first option on ties, so the result is deterministic.
+        selected = min(item_selects, key=lambda option:
+                       self.item_counts_.get(option['gifts'][0]['objectId'], 0))
+        object_id = selected['gifts'][0]['objectId']
+        stock = self.item_counts_.get(object_id, 0)
+        name = item_data.get('name') or str(first_object_id)
+        material = items_by_id.get(object_id, {})
+        namegift = material.get('originalName') or material.get('name') or str(object_id)
+        object_id_count = len(present_ids)
+
+        self.builder_.AddParameter(
+            'presentIds', base64.b64encode(msgpack.packb(present_ids)).decode())
+        self.builder_.AddParameter('itemSelectIdx', str(selected['idx']))
+        self.builder_.AddParameter('itemSelectNum', str(object_id_count))
+
+        self.Post(f'{fgourl.server_addr_}/present/receive?_userId={self.user_id_}')
+        main.logger.info(
+            f'{name} 兑换成功：{namegift}，兑换前库存 {stock}，使用 {object_id_count} 张券')
+        webhook.Present(name, namegift, object_id_count)
 
 
 
